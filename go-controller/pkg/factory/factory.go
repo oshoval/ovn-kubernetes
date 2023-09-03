@@ -54,6 +54,9 @@ import (
 	adminbasedpolicyinformerfactory "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/crd/adminpolicybasedroute/v1/apis/informers/externalversions"
 	adminpolicybasedrouteinformer "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/crd/adminpolicybasedroute/v1/apis/informers/externalversions/adminpolicybasedroute/v1"
 
+	nadinformerfactory "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/informers/externalversions"
+	nadlisters "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/client/listers/k8s.cni.cncf.io/v1"
+
 	kapi "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	knet "k8s.io/api/networking/v1"
@@ -88,6 +91,7 @@ type WatchFactory struct {
 	mnpFactory           mnpinformerfactory.SharedInformerFactory
 	egressServiceFactory egressserviceinformerfactory.SharedInformerFactory
 	apbRouteFactory      adminbasedpolicyinformerfactory.SharedInformerFactory
+	nadFactory           nadinformerfactory.SharedInformerFactory
 	informers            map[reflect.Type]*informer
 
 	stopChan chan struct{}
@@ -208,6 +212,7 @@ func NewOVNKubeControllerWatchFactory(ovnClientset *util.OVNKubeControllerClient
 		mnpFactory:           mnpinformerfactory.NewSharedInformerFactory(ovnClientset.MultiNetworkPolicyClient, resyncInterval),
 		egressServiceFactory: egressserviceinformerfactory.NewSharedInformerFactory(ovnClientset.EgressServiceClient, resyncInterval),
 		apbRouteFactory:      adminbasedpolicyinformerfactory.NewSharedInformerFactory(ovnClientset.AdminPolicyRouteClient, resyncInterval),
+		nadFactory:           nadinformerfactory.NewSharedInformerFactory(ovnClientset.NetworkAttchDefClient, resyncInterval),
 		informers:            make(map[reflect.Type]*informer),
 		stopChan:             make(chan struct{}),
 	}
@@ -286,6 +291,10 @@ func NewOVNKubeControllerWatchFactory(ovnClientset *util.OVNKubeControllerClient
 		return nil, err
 	}
 	wf.informers[EndpointSliceType], err = newInformer(EndpointSliceType, wf.iFactory.Discovery().V1().EndpointSlices().Informer())
+	if err != nil {
+		return nil, err
+	}
+	wf.informers[NetworkAttachmentDefinitionType], err = newInformer(NetworkAttachmentDefinitionType, wf.nadFactory.K8sCniCncfIo().V1().NetworkAttachmentDefinitions().Informer())
 	if err != nil {
 		return nil, err
 	}
@@ -410,6 +419,15 @@ func (wf *WatchFactory) Start() error {
 	if config.OVNKubernetesFeature.EnableMultiExternalGateway && wf.apbRouteFactory != nil {
 		wf.apbRouteFactory.Start(wf.stopChan)
 		for oType, synced := range waitForCacheSyncWithTimeout(wf.apbRouteFactory, wf.stopChan) {
+			if !synced {
+				return fmt.Errorf("error in syncing cache for %v informer", oType)
+			}
+		}
+	}
+
+	if wf.nadFactory != nil {
+		wf.nadFactory.Start(wf.stopChan)
+		for oType, synced := range waitForCacheSyncWithTimeout(wf.nadFactory, wf.stopChan) {
 			if !synced {
 				return fmt.Errorf("error in syncing cache for %v informer", oType)
 			}
@@ -798,6 +816,11 @@ func (wf *WatchFactory) GetResourceHandlerFunc(objType reflect.Type) (AddHandler
 			return wf.AddEndpointSliceHandler(funcs, processExisting)
 		}, nil
 
+	case NetworkAttachmentDefinitionType:
+		return func(namespace string, sel labels.Selector,
+			funcs cache.ResourceEventHandler, processExisting func([]interface{}) error) (*Handler, error) {
+			return wf.AddNetworkAttachmentDefinitionHandler(funcs, processExisting)
+		}, nil
 	}
 	return nil, fmt.Errorf("cannot get ObjectMeta from type %v", objType)
 }
@@ -1144,6 +1167,12 @@ func (wf *WatchFactory) GetNamespacesBySelector(labelSelector metav1.LabelSelect
 		return nil, err
 	}
 	return namespaceLister.List(selector)
+}
+
+// GetNetworkAttachmentDefinition gets a specific network attachment definition by the namespace/name
+func (wf *WatchFactory) GetNetworkAttachmentDefinition(namespace, name string) (*nadapi.NetworkAttachmentDefinition, error) {
+	nadLister := wf.informers[NetworkAttachmentDefinitionType].lister.(nadlisters.NetworkAttachmentDefinitionLister)
+	return nadLister.NetworkAttachmentDefinitions(namespace).Get(name)
 }
 
 // GetNetworkPolicy gets a specific network policy by the namespace/name

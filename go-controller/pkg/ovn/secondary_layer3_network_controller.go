@@ -213,6 +213,9 @@ func (h *secondaryLayer3NetworkControllerEventHandler) SyncFunc(objs []interface
 		case factory.MultiNetworkPolicyType:
 			syncFunc = h.oc.syncMultiNetworkPolicies
 
+		case factory.NetworkAttachmentDefinitionType:
+			syncFunc = h.oc.syncNetworkAttachments
+
 		default:
 			return fmt.Errorf("no sync function for object type %s", h.objType)
 		}
@@ -304,6 +307,8 @@ func (oc *SecondaryLayer3NetworkController) initRetryFramework() {
 		oc.retryNamespaces = oc.newRetryFramework(factory.NamespaceType)
 		oc.retryNetworkPolicies = oc.newRetryFramework(factory.MultiNetworkPolicyType)
 	}
+
+	oc.retryNetworkAttachments = oc.newRetryFramework(factory.NetworkAttachmentDefinitionType)
 }
 
 // newRetryFramework builds and returns a retry framework for the input resource type;
@@ -358,6 +363,9 @@ func (oc *SecondaryLayer3NetworkController) Stop() {
 	}
 	if oc.namespaceHandler != nil {
 		oc.watchFactory.RemoveNamespaceHandler(oc.namespaceHandler)
+	}
+	if oc.nadHandler != nil {
+		oc.watchFactory.RemoveNetworkAttachmentDefinitionHandler(oc.nadHandler)
 	}
 }
 
@@ -427,6 +435,10 @@ func (oc *SecondaryLayer3NetworkController) Run() error {
 
 	// WatchMultiNetworkPolicy depends on WatchPods and WatchNamespaces
 	if err := oc.WatchMultiNetworkPolicy(); err != nil {
+		return err
+	}
+
+	if err := oc.WatchNetworkAttachments(); err != nil {
 		return err
 	}
 

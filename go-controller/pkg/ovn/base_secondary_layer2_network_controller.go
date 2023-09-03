@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	mnpapi "github.com/k8snetworkplumbingwg/multi-networkpolicy/pkg/apis/k8s.cni.cncf.io/v1beta1"
+	nadapi "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/config"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/factory"
 	libovsdbops "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/libovsdb/ops"
@@ -57,6 +58,10 @@ func (h *baseSecondaryLayer2NetworkControllerEventHandler) RecordAddEvent(obj in
 		mnp := obj.(*mnpapi.MultiNetworkPolicy)
 		klog.V(5).Infof("Recording add event on multinetwork policy %s/%s", mnp.Namespace, mnp.Name)
 		metrics.GetConfigDurationRecorder().Start("multinetworkpolicy", mnp.Namespace, mnp.Name)
+	case factory.NetworkAttachmentDefinitionType:
+		nad := obj.(*nadapi.NetworkAttachmentDefinition)
+		klog.V(5).Infof("Recording add event on network attachment definition %s/%s", nad.Namespace, nad.Name)
+		metrics.GetConfigDurationRecorder().Start("networkattachmentdefinition", nad.Namespace, nad.Name)
 	}
 }
 
@@ -124,6 +129,9 @@ func (h *baseSecondaryLayer2NetworkControllerEventHandler) SyncFunc(objs []inter
 		case factory.MultiNetworkPolicyType:
 			syncFunc = h.oc.syncMultiNetworkPolicies
 
+		case factory.NetworkAttachmentDefinitionType:
+			syncFunc = h.oc.syncNetworkAttachments
+
 		default:
 			return fmt.Errorf("no sync function for object type %s", h.objType)
 		}
@@ -156,6 +164,8 @@ func (oc *BaseSecondaryLayer2NetworkController) initRetryFramework() {
 		oc.retryNamespaces = oc.newRetryFramework(factory.NamespaceType)
 		oc.retryNetworkPolicies = oc.newRetryFramework(factory.MultiNetworkPolicyType)
 	}
+
+	oc.retryNetworkAttachments = oc.newRetryFramework(factory.NetworkAttachmentDefinitionType)
 }
 
 // newRetryFramework builds and returns a retry framework for the input resource type;
@@ -198,6 +208,9 @@ func (oc *BaseSecondaryLayer2NetworkController) stop() {
 	if oc.namespaceHandler != nil {
 		oc.watchFactory.RemoveNamespaceHandler(oc.namespaceHandler)
 	}
+	if oc.nadHandler != nil {
+		oc.watchFactory.RemoveNetworkAttachmentDefinitionHandler(oc.nadHandler)
+	}
 }
 
 // cleanup cleans up logical entities for the given network, called from net-attach-def routine
@@ -238,6 +251,10 @@ func (oc *BaseSecondaryLayer2NetworkController) run() error {
 
 	// WatchMultiNetworkPolicy depends on WatchPods and WatchNamespaces
 	if err := oc.WatchMultiNetworkPolicy(); err != nil {
+		return err
+	}
+
+	if err := oc.WatchNetworkAttachments(); err != nil {
 		return err
 	}
 

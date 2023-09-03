@@ -90,6 +90,8 @@ type BaseNetworkController struct {
 	retryNamespaces *ovnretry.RetryFramework
 	// retry framework for network policies
 	retryNetworkPolicies *ovnretry.RetryFramework
+	// retry framework for network attachment definitions
+	retryNetworkAttachments *ovnretry.RetryFramework
 
 	// pod events factory handler
 	podHandler *factory.Handler
@@ -164,6 +166,8 @@ type BaseSecondaryNetworkController struct {
 	BaseNetworkController
 	// multi-network policy events factory handler
 	policyHandler *factory.Handler
+	// network attachment definition events factory handle
+	nadHandler *factory.Handler
 }
 
 // NewCommonNetworkControllerInfo creates CommonNetworkControllerInfo shared by controllers

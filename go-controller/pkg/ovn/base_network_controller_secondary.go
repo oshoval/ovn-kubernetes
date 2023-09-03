@@ -47,6 +47,7 @@ func (bsnc *BaseSecondaryNetworkController) GetInternalCacheEntryForSecondaryNet
 func (bsnc *BaseSecondaryNetworkController) AddSecondaryNetworkResourceCommon(objType reflect.Type, obj interface{}) error {
 	switch objType {
 	case factory.PodType:
+		klog.Infof("DBG pod")
 		pod, ok := obj.(*kapi.Pod)
 		if !ok {
 			return fmt.Errorf("could not cast %T object to *knet.Pod", obj)
@@ -54,6 +55,7 @@ func (bsnc *BaseSecondaryNetworkController) AddSecondaryNetworkResourceCommon(ob
 		return bsnc.ensurePodForSecondaryNetwork(pod, true)
 
 	case factory.NamespaceType:
+		klog.Infof("DBG Namespace")
 		ns, ok := obj.(*kapi.Namespace)
 		if !ok {
 			return fmt.Errorf("could not cast %T object to *kapi.Namespace", obj)
@@ -61,6 +63,7 @@ func (bsnc *BaseSecondaryNetworkController) AddSecondaryNetworkResourceCommon(ob
 		return bsnc.AddNamespaceForSecondaryNetwork(ns)
 
 	case factory.MultiNetworkPolicyType:
+		klog.Infof("DBG MultiNetworkPolicyType")
 		mp, ok := obj.(*mnpapi.MultiNetworkPolicy)
 		if !ok {
 			return fmt.Errorf("could not cast %T object to *multinetworkpolicyapi.MultiNetworkPolicy", obj)
@@ -79,6 +82,15 @@ func (bsnc *BaseSecondaryNetworkController) AddSecondaryNetworkResourceCommon(ob
 				mp.Namespace, mp.Name, err)
 			return err
 		}
+
+	case factory.NetworkAttachmentDefinitionType:
+		// TODO remove the DBG all over
+		// klog.Infof("Good DBG Add NetworkAttachmentDefinitionType")
+		nad, ok := obj.(*nadapi.NetworkAttachmentDefinition)
+		if !ok {
+			return fmt.Errorf("could not cast %T object to *nadapi.NetworkAttachmentDefinition", obj)
+		}
+		bsnc.addNetworkAttachmentDefinition(nad)
 
 	default:
 		return fmt.Errorf("object type %s not supported", objType)
@@ -180,6 +192,14 @@ func (bsnc *BaseSecondaryNetworkController) DeleteSecondaryNetworkResourceCommon
 				mp.Namespace, mp.Name, err)
 			return err
 		}
+
+	case factory.NetworkAttachmentDefinitionType:
+		// klog.Infof("Good DBG Delete NetworkAttachmentDefinitionType")
+		nad, ok := obj.(*nadapi.NetworkAttachmentDefinition)
+		if !ok {
+			return fmt.Errorf("could not cast %T object to *nadapi.NetworkAttachmentDefinition", obj)
+		}
+		bsnc.deleteNetworkAttachmentDefinition(nad)
 
 	default:
 		return fmt.Errorf("object type %s not supported", objType)
@@ -526,6 +546,19 @@ func (bsnc *BaseSecondaryNetworkController) deleteNamespace4SecondaryNetwork(ns 
 		return fmt.Errorf("failed to delete multicast namespace error %v", err)
 	}
 	return nil
+}
+
+// WatchNetworkAttachments starts the watching of network attachment resource and calls
+// back the appropriate handler logic
+func (bsnc *BaseSecondaryNetworkController) WatchNetworkAttachments() error {
+	if bsnc.nadHandler != nil {
+		return nil
+	}
+	handler, err := bsnc.retryNetworkAttachments.WatchResource()
+	if err != nil {
+		bsnc.nadHandler = handler
+	}
+	return err
 }
 
 // WatchMultiNetworkPolicy starts the watching of multinetworkpolicy resource and calls

@@ -10,6 +10,7 @@ import (
 	"k8s.io/klog/v2"
 
 	mnpapi "github.com/k8snetworkplumbingwg/multi-networkpolicy/pkg/apis/k8s.cni.cncf.io/v1beta1"
+	nadapi "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	egressfirewall "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/crd/egressfirewall/v1"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/factory"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/metrics"
@@ -168,6 +169,9 @@ func (h *baseNetworkControllerEventHandler) getResourceFromInformerCache(objType
 	case factory.MultiNetworkPolicyType:
 		obj, err = watchFactory.GetMultiNetworkPolicy(namespace, name)
 
+	case factory.NetworkAttachmentDefinitionType:
+		obj, err = watchFactory.GetNetworkAttachmentDefinition(namespace, name)
+
 	default:
 		err = fmt.Errorf("object type %s not supported, cannot retrieve it from informers cache",
 			objType)
@@ -219,6 +223,10 @@ func (h *baseNetworkControllerEventHandler) recordAddEvent(objType reflect.Type,
 		mnp := obj.(*mnpapi.MultiNetworkPolicy)
 		klog.V(5).Infof("Recording add event on multinetwork policy %s/%s", mnp.Namespace, mnp.Name)
 		metrics.GetConfigDurationRecorder().Start("multinetworkpolicy", mnp.Namespace, mnp.Name)
+	case factory.NetworkAttachmentDefinitionType:
+		nad := obj.(*nadapi.NetworkAttachmentDefinition)
+		klog.V(5).Infof("Recording add event on network attachment definition %s/%s", nad.Namespace, nad.Name)
+		metrics.GetConfigDurationRecorder().Start("networkattachmentdefinition", nad.Namespace, nad.Name)
 	}
 }
 
@@ -239,6 +247,10 @@ func (h *baseNetworkControllerEventHandler) recordDeleteEvent(objType reflect.Ty
 		mnp := obj.(*mnpapi.MultiNetworkPolicy)
 		klog.V(5).Infof("Recording delete event on multinetwork policy %s/%s", mnp.Namespace, mnp.Name)
 		metrics.GetConfigDurationRecorder().Start("multinetworkpolicy", mnp.Namespace, mnp.Name)
+	case factory.NetworkAttachmentDefinitionType:
+		nad := obj.(*nadapi.NetworkAttachmentDefinition)
+		klog.V(5).Infof("Recording delete event on network attachment definition %s/%s", nad.Namespace, nad.Name)
+		metrics.GetConfigDurationRecorder().Start("networkattachmentdefinition", nad.Namespace, nad.Name)
 	}
 }
 

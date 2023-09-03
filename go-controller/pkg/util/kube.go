@@ -62,6 +62,7 @@ type OVNMasterClientset struct {
 	CloudNetworkClient       ocpcloudnetworkclientset.Interface
 	EgressFirewallClient     egressfirewallclientset.Interface
 	EgressQoSClient          egressqosclientset.Interface
+	NetworkAttchDefClient    networkattchmentdefclientset.Interface
 	MultiNetworkPolicyClient multinetworkpolicyclientset.Interface
 	EgressServiceClient      egressserviceclientset.Interface
 	AdminPolicyRouteClient   adminpolicybasedrouteclientset.Interface
@@ -74,6 +75,7 @@ type OVNKubeControllerClientset struct {
 	EgressIPClient           egressipclientset.Interface
 	EgressFirewallClient     egressfirewallclientset.Interface
 	EgressQoSClient          egressqosclientset.Interface
+	NetworkAttchDefClient    networkattchmentdefclientset.Interface
 	MultiNetworkPolicyClient multinetworkpolicyclientset.Interface
 	EgressServiceClient      egressserviceclientset.Interface
 	AdminPolicyRouteClient   adminpolicybasedrouteclientset.Interface
@@ -102,6 +104,7 @@ func (cs *OVNClientset) GetMasterClientset() *OVNMasterClientset {
 		CloudNetworkClient:       cs.CloudNetworkClient,
 		EgressFirewallClient:     cs.EgressFirewallClient,
 		EgressQoSClient:          cs.EgressQoSClient,
+		NetworkAttchDefClient:    cs.NetworkAttchDefClient,
 		MultiNetworkPolicyClient: cs.MultiNetworkPolicyClient,
 		EgressServiceClient:      cs.EgressServiceClient,
 		AdminPolicyRouteClient:   cs.AdminPolicyRouteClient,
@@ -115,6 +118,7 @@ func (cs *OVNMasterClientset) GetOVNKubeControllerClientset() *OVNKubeController
 		EgressIPClient:           cs.EgressIPClient,
 		EgressFirewallClient:     cs.EgressFirewallClient,
 		EgressQoSClient:          cs.EgressQoSClient,
+		NetworkAttchDefClient:    cs.NetworkAttchDefClient,
 		MultiNetworkPolicyClient: cs.MultiNetworkPolicyClient,
 		EgressServiceClient:      cs.EgressServiceClient,
 		AdminPolicyRouteClient:   cs.AdminPolicyRouteClient,
@@ -128,6 +132,7 @@ func (cs *OVNClientset) GetOVNKubeControllerClientset() *OVNKubeControllerClient
 		EgressIPClient:           cs.EgressIPClient,
 		EgressFirewallClient:     cs.EgressFirewallClient,
 		EgressQoSClient:          cs.EgressQoSClient,
+		NetworkAttchDefClient:    cs.NetworkAttchDefClient,
 		MultiNetworkPolicyClient: cs.MultiNetworkPolicyClient,
 		EgressServiceClient:      cs.EgressServiceClient,
 		AdminPolicyRouteClient:   cs.AdminPolicyRouteClient,

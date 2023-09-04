@@ -875,10 +875,6 @@ var _ = Describe("Multi Homing", func() {
 						Expect(err).NotTo(HaveOccurred())
 					}
 
-					By("sitting on our hands for a couple secs we give the controller time to sync all NADs before provisioning policies and pods")
-					// TODO: this is temporary. We hope to eventually sync pods & multi-net policies on NAD C/U/D ops
-					time.Sleep(3 * time.Second)
-
 					kickstartPod(cs, serverPodConfig)
 					kickstartPod(cs, allowedClientPodConfig)
 					kickstartPod(cs, blockedClientPodConfig)
@@ -1282,10 +1278,6 @@ var _ = Describe("Multi Homing", func() {
 				)
 				Expect(err).NotTo(HaveOccurred())
 			}
-
-			By("sitting on our hands for a couple secs we give the controller time to sync all NADs before provisioning policies and pods")
-			// TODO: this is temporary. We hope to eventually sync pods & multi-net policies on NAD C/U/D ops
-			time.Sleep(3 * time.Second)
 
 			podConfig := podConfiguration{
 				attachments: []nadapi.NetworkSelectionElement{

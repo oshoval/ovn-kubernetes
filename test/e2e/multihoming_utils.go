@@ -283,6 +283,22 @@ func multiNetIngressLimitingPolicy(policyFor string, appliesFor metav1.LabelSele
 	}
 }
 
+func multiNetIngressAllowAllPolicy(policyFor string, appliesFor metav1.LabelSelector) *mnpapi.MultiNetworkPolicy {
+	return &mnpapi.MultiNetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
+			PolicyForAnnotation: policyFor,
+		},
+			Name: "allow-all-via-pod-selector",
+		},
+
+		Spec: mnpapi.MultiNetworkPolicySpec{
+			PodSelector: appliesFor,
+			Ingress:     []mnpapi.MultiNetworkPolicyIngressRule{},
+			PolicyTypes: []mnpapi.MultiPolicyType{mnpapi.PolicyTypeIngress},
+		},
+	}
+}
+
 func multiNetIngressLimitingIPBlockPolicy(
 	policyFor string,
 	appliesFor metav1.LabelSelector,

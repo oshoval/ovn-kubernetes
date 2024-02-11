@@ -1029,6 +1029,39 @@ var _ = Describe("Multi Homing", func() {
 					),
 				),
 				ginkgo.Entry(
+					"for a localnet topology when the multi-net policy is ingress allow-all",
+					networkAttachmentConfigParams{
+						name:     secondaryNetworkName,
+						topology: "localnet",
+						cidr:     secondaryLocalnetNetworkCIDR,
+					},
+					podConfiguration{
+						attachments: []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:        allowedClient(clientPodName),
+						labels: map[string]string{
+							"app":  "client",
+							"role": "trusted",
+						},
+					},
+					podConfiguration{
+						attachments: []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:        blockedClient(clientPodName),
+						labels:      map[string]string{"app": "client"},
+					},
+					podConfiguration{
+						attachments:  []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:         podName,
+						containerCmd: httpServerContainerCmd(port),
+						labels:       map[string]string{"app": "stuff-doer"},
+					},
+					multiNetIngressAllowAllPolicy(
+						secondaryNetworkName,
+						metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "stuff-doer"},
+						},
+					),
+				),
+				ginkgo.Entry(
 					"for a pure L2 overlay when the multi-net policy describes the allow-list using IPBlock",
 					networkAttachmentConfigParams{
 						name:     secondaryNetworkName,

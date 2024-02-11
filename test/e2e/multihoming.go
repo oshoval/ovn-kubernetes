@@ -27,6 +27,14 @@ import (
 
 const PolicyForAnnotation = "k8s.v1.cni.cncf.io/policy-for"
 
+type Permission int
+
+const (
+	Specific Permission = iota
+	AllowAll
+	DenyAll
+)
+
 var _ = Describe("Multi Homing", func() {
 	const (
 		podName                      = "tinypod"
@@ -938,7 +946,7 @@ var _ = Describe("Multi Homing", func() {
 
 			ginkgo.DescribeTable(
 				"multi-network policies configure traffic allow lists",
-				func(netConfigParams networkAttachmentConfigParams, allowedClientPodConfig podConfiguration, blockedClientPodConfig podConfiguration, serverPodConfig podConfiguration, policy *mnpapi.MultiNetworkPolicy) {
+				func(netConfigParams networkAttachmentConfigParams, allowedClientPodConfig podConfiguration, blockedClientPodConfig podConfiguration, serverPodConfig podConfiguration, policy *mnpapi.MultiNetworkPolicy, permission Permission) {
 					netConfig := newNetworkAttachmentConfig(netConfigParams)
 
 					blockedClientPodNamespace := f.Namespace.Name
@@ -1012,15 +1020,27 @@ var _ = Describe("Multi Homing", func() {
 					)
 					Expect(err).To(Succeed())
 
-					By("asserting the *allowed-client* pod can contact the server pod exposed endpoint")
-					Eventually(func() error {
-						return reachToServerPodFromClient(cs, serverPodConfig, allowedClientPodConfig, serverIP, port)
-					}, 2*time.Minute, 6*time.Second).Should(Succeed())
+					if permission != DenyAll {
+						By("asserting the *allowed-client* pod can contact the server pod exposed endpoint")
+						Eventually(func() error {
+							return reachToServerPodFromClient(cs, serverPodConfig, allowedClientPodConfig, serverIP, port)
+						}, 2*time.Minute, 6*time.Second).Should(Succeed())
+					} else {
+						By("asserting the *allowed-client* pod can't contact the server pod exposed endpoint when using ingress deny-all")
+						Eventually(func() error {
+							return reachToServerPodFromClient(cs, serverPodConfig, allowedClientPodConfig, serverIP, port)
+						}, 2*time.Minute, 6*time.Second).Should(Not(Succeed()))
+					}
 
-					By("asserting the *blocked-client* pod **cannot** contact the server pod exposed endpoint")
-					Expect(connectToServer(blockedClientPodConfig, serverIP, port)).To(
-						MatchError(
-							MatchRegexp("Connection timeout after 200[0-9] ms")))
+					if permission == AllowAll {
+						By("asserting the *blocked-client* pod **can** contact the server pod exposed endpoint when using ingress allow-all")
+						Expect(connectToServer(blockedClientPodConfig, serverIP, port)).To(Succeed())
+					} else {
+						By("asserting the *blocked-client* pod **cannot** contact the server pod exposed endpoint")
+						Expect(connectToServer(blockedClientPodConfig, serverIP, port)).To(
+							MatchError(
+								MatchRegexp("Connection timeout after 200[0-9] ms")))
+					}
 				},
 				ginkgo.Entry(
 					"for a pure L2 overlay when the multi-net policy describes the allow-list using pod selectors",
@@ -1058,6 +1078,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a routed topology when the multi-net policy describes the allow-list using pod selectors",
@@ -1095,6 +1116,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a localnet topology when the multi-net policy describes the allow-list using pod selectors",
@@ -1132,6 +1154,83 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
+				),
+				ginkgo.Entry(
+					"for a localnet topology when the multi-net policy is ingress allow-all",
+					networkAttachmentConfigParams{
+						name:     secondaryNetworkName,
+						topology: "localnet",
+						cidr:     secondaryLocalnetNetworkCIDR,
+					},
+					podConfiguration{
+						attachments: []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:        allowedClient(clientPodName),
+						labels: map[string]string{
+							"app":  "client",
+							"role": "trusted",
+						},
+					},
+					podConfiguration{
+						attachments: []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:        blockedClient(clientPodName),
+						labels:      map[string]string{"app": "client"},
+					},
+					podConfiguration{
+						attachments:  []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:         podName,
+						containerCmd: httpServerContainerCmd(port),
+						labels:       map[string]string{"app": "stuff-doer"},
+					},
+					multiNetPolicy(
+						"allow-all-ingress",
+						secondaryNetworkName,
+						metav1.LabelSelector{},
+						[]mnpapi.MultiPolicyType{mnpapi.PolicyTypeIngress},
+						[]mnpapi.MultiNetworkPolicyIngressRule{
+							mnpapi.MultiNetworkPolicyIngressRule{},
+						},
+						nil,
+					),
+					AllowAll,
+				),
+				ginkgo.Entry(
+					"for a localnet topology when the multi-net policy is ingress deny-all",
+					networkAttachmentConfigParams{
+						name:     secondaryNetworkName,
+						topology: "localnet",
+						cidr:     secondaryLocalnetNetworkCIDR,
+					},
+					podConfiguration{
+						attachments: []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:        allowedClient(clientPodName),
+						labels: map[string]string{
+							"app":  "client",
+							"role": "trusted",
+						},
+					},
+					podConfiguration{
+						attachments: []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:        blockedClient(clientPodName),
+						labels:      map[string]string{"app": "client"},
+					},
+					podConfiguration{
+						attachments:  []nadapi.NetworkSelectionElement{{Name: secondaryNetworkName}},
+						name:         podName,
+						containerCmd: httpServerContainerCmd(port),
+						labels:       map[string]string{"app": "stuff-doer"},
+					},
+					multiNetPolicy(
+						"deny-all-ingress",
+						secondaryNetworkName,
+						metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "stuff-doer"},
+						},
+						[]mnpapi.MultiPolicyType{mnpapi.PolicyTypeIngress},
+						nil,
+						nil,
+					),
+					DenyAll,
 				),
 				ginkgo.Entry(
 					"for a pure L2 overlay when the multi-net policy describes the allow-list using IPBlock",
@@ -1164,6 +1263,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a routed topology when the multi-net policy describes the allow-list using IPBlock",
@@ -1196,6 +1296,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a localnet topology when the multi-net policy describes the allow-list using IPBlock",
@@ -1228,6 +1329,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a pure L2 overlay when the multi-net policy describes the allow-list via namespace selectors",
@@ -1262,6 +1364,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a routed topology when the multi-net policy describes the allow-list via namespace selectors",
@@ -1296,6 +1399,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 				ginkgo.Entry(
 					"for a localnet topology when the multi-net policy describes the allow-list via namespace selectors",
@@ -1330,6 +1434,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 
 				ginkgo.Entry(
@@ -1363,6 +1468,7 @@ var _ = Describe("Multi Homing", func() {
 						},
 						port,
 					),
+					Specific,
 				),
 			)
 		})

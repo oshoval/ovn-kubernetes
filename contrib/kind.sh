@@ -1190,6 +1190,24 @@ install_ipamclaim_crd() {
   run_kubectl apply -f "$ipamclaims_manifest"
 }
 
+trap '{ echo bla && collect_debug_logs; }' EXIT
+
+collect_debug_logs() {
+    kubectl get pods -A
+    kubectl describe ds -n ovn-kubernetes ovnkube-node
+    kubectl get events -A
+    for ns in $(kubectl get namespaces -o=jsonpath='{.items[*].metadata.name}'); do
+        for pod in $(kubectl get pods -n $ns -o=jsonpath='{.items[*].metadata.name}'); do
+            echo "<================= $ns - $pod =================>"
+            kubectl logs -n $ns $pod || true
+        done
+    done
+
+    for pod in $(kubectl -n ovn-kubernetes get pods -l app=ovs-node -o jsonpath='{.items[*].metadata.name}'); do
+        kubectl describe pod -n ovn-kubernetes $pod
+    done
+}
+
 # kubectl_wait_pods will set a total timeout of 300s for IPv4 and 480s for IPv6. It will first wait for all
 # DaemonSets to complete with kubectl rollout. This command will block until all pods of the DS are actually up.
 # Next, it iterates over all pods with name=ovnkube-db and ovnkube-master and waits for them to post "Ready".
@@ -1490,6 +1508,7 @@ if [ "$ENABLE_MULTI_NET" == true ]; then
   install_ipamclaim_crd
   docker_create_second_disconnected_interface "underlay"  # localnet scenarios require an extra interface
 fi
+
 kubectl_wait_pods
 sleep_until_pods_settle
 # Launch IPsec pods last to make sure that CSR signing logic works

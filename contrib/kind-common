@@ -338,10 +338,18 @@ install_kubevirt() {
     done
     
     if [ "$(kubectl get kubevirts -n kubevirt kubevirt -ojsonpath='{.status.phase}')" != "Deployed" ]; then
+      KUBEVIRT_VERSION=20241010
       local kubevirt_release_url=$(get_kubevirt_release_url "$KUBEVIRT_VERSION")
       echo "Deploying Kubevirt from $kubevirt_release_url"
-      kubectl apply -f "${kubevirt_release_url}/kubevirt-operator.yaml"
-      kubectl apply -f "${kubevirt_release_url}/kubevirt-cr.yaml"
+
+      curl -LO "$kubevirt_release_url/kubevirt-operator.yaml"
+      curl -LO "$kubevirt_release_url/kubevirt-cr.yaml"
+
+      sed -i "s|quay.io/kubevirt/virt-operator:[^ ]*|quay.io/oshoval/virt-operator:20241010_3dda04c0fd|g" kubevirt-operator.yaml
+
+      kubectl apply -f "kubevirt-operator.yaml"
+      kubectl apply -f "kubevirt-cr.yaml"
+
       if ! is_nested_virt_enabled; then
         kubectl -n kubevirt patch kubevirt kubevirt --type=merge --patch '{"spec":{"configuration":{"developerConfiguration":{"useEmulation":true}}}}'
       fi

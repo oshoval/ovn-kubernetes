@@ -178,6 +178,10 @@ func (c *shimClientset) getPod(namespace, name string) (*kapi.Pod, error) {
 	return c.kclient.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
+func (c *shimClientset) getNode(name string) (*kapi.Node, error) {
+	return c.kclient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+}
+
 // CmdAdd is the callback for 'add' cni calls from skel
 func (p *Plugin) CmdAdd(args *skel.CmdArgs) error {
 	var err error

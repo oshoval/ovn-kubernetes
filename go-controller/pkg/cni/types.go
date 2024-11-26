@@ -169,16 +169,26 @@ type PodRequest struct {
 }
 
 type podRequestFunc func(request *PodRequest, clientset *ClientSet, kubeAuth *KubeAPIAuth, nadController *nad.NetAttachDefinitionController) ([]byte, error)
-type getCNIResultFunc func(request *PodRequest, getter PodInfoGetter, podInterfaceInfo *PodInterfaceInfo) (*current.Result, error)
+type getCNIResultFunc func(request *PodRequest, getter PodAndNodeInfoGetter, podInterfaceInfo *PodInterfaceInfo) (*current.Result, error)
+
+type PodAndNodeInfoGetter interface {
+	PodInfoGetter
+	NodeInfoGetter
+}
 
 type PodInfoGetter interface {
 	getPod(namespace, name string) (*kapi.Pod, error)
 }
 
+type NodeInfoGetter interface {
+	getNode(name string) (*kapi.Node, error)
+}
+
 type ClientSet struct {
-	PodInfoGetter
-	kclient   kubernetes.Interface
-	podLister corev1listers.PodLister
+	PodAndNodeInfoGetter
+	kclient    kubernetes.Interface
+	podLister  corev1listers.PodLister
+	nodeLister corev1listers.NodeLister
 }
 
 func NewClientSet(kclient kubernetes.Interface, podLister corev1listers.PodLister) *ClientSet {

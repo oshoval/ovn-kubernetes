@@ -59,6 +59,26 @@ func (c *ClientSet) getPod(namespace, name string) (*kapi.Pod, error) {
 	return pod, err
 }
 
+// getNode tries to read a Node object from the informer cache, or if the node
+// doesn't exist there, the apiserver. If neither a list or a kube client is
+// given, returns no node and no error
+func (c *ClientSet) getNode(name string) (*kapi.Node, error) {
+	var node *kapi.Node
+	var err error
+
+	node, err = c.nodeLister.Get(name)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if node == nil {
+		// If the node wasn't in our local cache, ask for it directly
+		node, err = c.kclient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+	}
+
+	return node, err
+}
+
 // GetPodAnnotations obtains the pod UID and annotation from the cache or apiserver
 func GetPodWithAnnotations(ctx context.Context, getter PodInfoGetter,
 	namespace, name, nadName string, annotCond podAnnotWaitCond) (*kapi.Pod, map[string]string, *util.PodAnnotation, error) {

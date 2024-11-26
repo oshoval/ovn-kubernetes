@@ -62,8 +62,9 @@ func NewCNIServer(factory factory.NodeWatchFactory, kclient kubernetes.Interface
 			Handler: router,
 		},
 		clientSet: &ClientSet{
-			podLister: corev1listers.NewPodLister(factory.LocalPodInformer().GetIndexer()),
-			kclient:   kclient,
+			podLister:  corev1listers.NewPodLister(factory.LocalPodInformer().GetIndexer()),
+			nodeLister: corev1listers.NewNodeLister(factory.NodeInformer().GetIndexer()),
+			kclient:    kclient,
 		},
 		kubeAuth: &KubeAPIAuth{
 			Kubeconfig:       config.Kubernetes.Kubeconfig,

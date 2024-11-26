@@ -331,10 +331,10 @@ func HandlePodRequest(request *PodRequest, clientset *ClientSet, kubeAuth *KubeA
 }
 
 // getCNIResult get result from pod interface info.
-// PodInfoGetter is used to check if sandbox is still valid for the current
+// PodAndNodeInfoGetter is used to check if sandbox is still valid for the current
 // instance of the pod in the apiserver, see checkCancelSandbox for more info.
 // If kube api is not available from the CNI, pass nil to skip this check.
-func getCNIResult(pr *PodRequest, getter PodInfoGetter, podInterfaceInfo *PodInterfaceInfo) (*current.Result, error) {
+func getCNIResult(pr *PodRequest, getter PodAndNodeInfoGetter, podInterfaceInfo *PodInterfaceInfo) (*current.Result, error) {
 	interfacesArray, err := podRequestInterfaceOps.ConfigureInterface(pr, getter, podInterfaceInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to configure pod interface: %v", err)

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/knftables"
 
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/types"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"
@@ -250,6 +251,12 @@ func setupInterface(netns ns.NetNS, containerID, ifName string, ifInfo *PodInter
 		// to generate the unique host interface name, postfix it with the podInterface index for non-default network
 		if ifInfo.NetName != types.DefaultNetworkName {
 			ifnameSuffix = fmt.Sprintf("_%d", containerVeth.Index)
+		}
+
+		if ifName == "ovn-udn1" {
+			if err = setupIngressFilter(); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -569,7 +576,7 @@ func ConfigureOVS(ctx context.Context, namespace, podName, hostIfaceName string,
 }
 
 type PodRequestInterfaceOps interface {
-	ConfigureInterface(pr *PodRequest, getter PodInfoGetter, ifInfo *PodInterfaceInfo) ([]*current.Interface, error)
+	ConfigureInterface(pr *PodRequest, getter PodAndNodeInfoGetter, ifInfo *PodInterfaceInfo) ([]*current.Interface, error)
 	UnconfigureInterface(pr *PodRequest, ifInfo *PodInterfaceInfo) error
 }
 
@@ -578,7 +585,7 @@ type defaultPodRequestInterfaceOps struct{}
 var podRequestInterfaceOps PodRequestInterfaceOps = &defaultPodRequestInterfaceOps{}
 
 // ConfigureInterface sets up the container interface
-func (*defaultPodRequestInterfaceOps) ConfigureInterface(pr *PodRequest, getter PodInfoGetter, ifInfo *PodInterfaceInfo) ([]*current.Interface, error) {
+func (*defaultPodRequestInterfaceOps) ConfigureInterface(pr *PodRequest, getter PodAndNodeInfoGetter, ifInfo *PodInterfaceInfo) ([]*current.Interface, error) {
 	netns, err := ns.GetNS(pr.Netns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open netns %q: %v", pr.Netns, err)
@@ -817,3 +824,41 @@ func (pr *PodRequest) deletePorts(ifaces []string, podNamespace, podName string)
 		pr.deletePort(iface, podNamespace, podName)
 	}
 }
+
+func setupIngressFilter() error {
+	tableName := "ingress_filter"
+	chainName := "input"
+	deviceName := "ovn-udn1"
+
+	nft, err := knftables.New(knftables.NetDevFamily, tableName)
+	if err != nil {
+		return fmt.Errorf("failed to initialize table: %w", err)
+	}
+
+	tx := nft.NewTransaction()
+
+	tx.Add(&knftables.Table{})
+
+	tx.Add(&knftables.Chain{
+		Name:     chainName,
+		Type:     knftables.PtrTo(knftables.FilterType),
+		Hook:     knftables.PtrTo(knftables.IngressHook),
+		Priority: knftables.PtrTo(knftables.FilterPriority),
+		Device:   knftables.PtrTo(deviceName),
+	})
+
+	tx.Add(&knftables.Rule{
+		Chain: chainName,
+		Rule: knftables.Concat(
+			"icmpv6", "type", "nd-router-advert", "ip6", "saddr", "!=", "fe80::858:64ff:fe41:3", "@th,48,16", "!=", "0", "drop",
+		),
+	})
+
+	err = nft.Run(context.TODO(), tx)
+	if err != nil {
+		return fmt.Errorf("could not update netdev nftables: %v", err)
+	}
+
+	return nil
+}
+

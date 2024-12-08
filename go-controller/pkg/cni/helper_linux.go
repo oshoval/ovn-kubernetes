@@ -20,6 +20,7 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/knftables"
 
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/types"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"
@@ -250,6 +251,22 @@ func setupInterface(netns ns.NetNS, containerID, ifName string, ifInfo *PodInter
 		// to generate the unique host interface name, postfix it with the podInterface index for non-default network
 		if ifInfo.NetName != types.DefaultNetworkName {
 			ifnameSuffix = fmt.Sprintf("_%d", containerVeth.Index)
+		}
+
+		// If we have the ipv6 gateway LLA then this is a primary layer2 UDN
+		if len(ifInfo.GatewayIPv6LLA) > 0 {
+			const (
+				tableName  = "ingress_filter"
+				RALifetime = "@th,48,16"
+			)
+			nft, err := knftables.New(knftables.NetDevFamily, tableName)
+			if err != nil {
+				return fmt.Errorf("failed to initialize table: %w", err)
+			}
+
+			if err = setupIngressFilter(nft, ifInfo.GatewayIPv6LLA.String(), RALifetime); err != nil {
+				return err
+			}
 		}
 
 		return nil
@@ -597,6 +614,7 @@ func (*defaultPodRequestInterfaceOps) ConfigureInterface(pr *PodRequest, getter 
 			return nil, fmt.Errorf("unexpected configuration, pod request on dpu host. " +
 				"device ID must be provided")
 		}
+
 		// General case
 		hostIface, contIface, err = setupInterface(netns, pr.SandboxID, pr.IfName, ifInfo)
 	}
@@ -817,4 +835,36 @@ func (pr *PodRequest) deletePorts(ifaces []string, podNamespace, podName string)
 	for _, iface := range ifaces {
 		pr.deletePort(iface, podNamespace, podName)
 	}
+}
+
+func setupIngressFilter(nft knftables.Interface, gwLLA string, lifetime string) error {
+	const (
+		chainName  = "input"
+		deviceName = "ovn-udn1"
+	)
+
+	tx := nft.NewTransaction()
+
+	tx.Add(&knftables.Table{})
+
+	tx.Add(&knftables.Chain{
+		Name:     chainName,
+		Type:     knftables.PtrTo(knftables.FilterType),
+		Hook:     knftables.PtrTo(knftables.IngressHook),
+		Priority: knftables.PtrTo(knftables.FilterPriority),
+		Device:   knftables.PtrTo(deviceName),
+	})
+
+	tx.Add(&knftables.Rule{
+		Chain: chainName,
+		Rule: knftables.Concat(
+			"icmpv6", "type", "nd-router-advert", "ip6", "saddr", "!=", gwLLA, lifetime, "!=", "0", "drop",
+		),
+	})
+
+	if err := nft.Run(context.Background(), tx); err != nil {
+		return fmt.Errorf("could not update netdev nftables: %v", err)
+	}
+
+	return nil
 }

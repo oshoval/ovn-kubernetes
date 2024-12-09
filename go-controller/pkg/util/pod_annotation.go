@@ -578,7 +578,8 @@ func AddRoutesGatewayIP(
 			if _, isIPv6Mode := netinfo.IPMode(); isIPv6Mode {
 				joinAddrs, err := ParseNodeGatewayRouterJoinAddrs(node, netinfo.GetNetworkName())
 				if err != nil {
-					return err
+					// until https://github.com/ovn-kubernetes/ovn-kubernetes/issues/4876 is fixed, ignore the errors
+					return nil
 				}
 				podAnnotation.IPv6LLAGateway = HWAddrToIPv6LLA(IPAddrToHWAddr(joinAddrs[0].IP))
 			}

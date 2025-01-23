@@ -34,6 +34,7 @@ import (
 	udnclientfake "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/crd/userdefinednetwork/v1/apis/clientset/versioned/fake"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/networkmanager"
 	testnm "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/testing/networkmanager"
+	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/vswitchd"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,6 +92,7 @@ type FakeOVN struct {
 	networkManager networkmanager.Controller
 	eIPController  *EgressIPController
 	portCache      *PortCache
+	externalIDs    map[string]string
 
 	// information map of all secondary network controllers
 	secondaryControllers       map[string]secondaryControllerInfo
@@ -564,7 +566,11 @@ func (o *FakeOVN) NewSecondaryNetworkController(netattachdef *nettypes.NetworkAt
 			secondaryController = &l2Controller.BaseSecondaryNetworkController
 			o.fullSecondaryL2Controllers[netName] = l2Controller
 		case types.LocalnetTopology:
-			localnetController := NewSecondaryLocalnetNetworkController(cnci, nInfo, o.networkManager.Interface())
+			ovsClient, err := o.setupOVSWithExternalIDs()
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			localnetController, err := newSecondaryLocalnetNetworkController(cnci, nInfo, o.networkManager.Interface(), ovsClient)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			if o.asf != nil { // use fake asf only when enabled
 				localnetController.addressSetFactory = asf
 			}
@@ -592,6 +598,17 @@ func (o *FakeOVN) NewSecondaryNetworkController(netattachdef *nettypes.NetworkAt
 	return nil
 }
 
+func (o *FakeOVN) SetExternalIDs(externalIDs map[string]string) {
+	o.externalIDs = make(map[string]string, len(externalIDs))
+	for k, v := range externalIDs {
+		o.externalIDs[k] = v
+	}
+}
+
+func (o *FakeOVN) ClearExternalIDs() {
+	o.externalIDs = nil
+}
+
 func (o *FakeOVN) patchEgressIPObj(nodeName, egressIPName, egressIP, network string) {
 	// NOTE: Cluster manager is the one who patches the egressIP object.
 	// For the sake of unit testing egressip zone controller we need to patch egressIP object manually
@@ -612,4 +629,16 @@ func nadGVR() metav1.GroupVersionResource {
 		Version:  "v1",
 		Resource: "network-attachment-definitions",
 	}
+}
+
+func (o *FakeOVN) setupOVSWithExternalIDs() (libovsdbclient.Client, error) {
+	dbSetup := libovsdbtest.TestSetup{
+		OVSData: []libovsdbtest.TestData{
+			&vswitchd.OpenvSwitch{
+				ExternalIDs: o.externalIDs,
+			},
+		},
+	}
+	ovsClient, _, err := libovsdbtest.NewOVSTestHarness(dbSetup)
+	return ovsClient, err
 }

@@ -454,6 +454,19 @@ func (bnc *BaseNetworkController) addLogicalPortToNetwork(pod *kapi.Pod, nadName
 		return nil, nil, nil, false, fmt.Errorf("[%s] failed geting expected switch name when adding logical switch port: %v", podDesc, err)
 	}
 
+	if bnc.TopologyType() == ovntypes.LocalnetTopology {
+		netInfo := bnc.GetNetInfo()
+		networkName := netInfo.GetNetworkName()
+		if netInfo.PhysicalNetworkName() != "" {
+			networkName = netInfo.PhysicalNetworkName()
+		}
+
+		if err := checkBridgeMapping(networkName); err != nil {
+			bnc.recordPodErrorEvent(pod, err)
+			return nil, nil, nil, false, err
+		}
+	}
+
 	// it is possible to try to add a pod here that has no node. For example if a pod was deleted with
 	// a finalizer, and then the node was removed. In this case the pod will still exist in a running state.
 	// Terminating pods should still have network connectivity for pre-stop hooks or termination grace period
@@ -1176,4 +1189,22 @@ func (bnc *BaseNetworkController) wasPodReleasedBeforeStartup(uid, nad string) b
 		return false
 	}
 	return bnc.releasedPodsBeforeStartup[nad].Has(uid)
+}
+
+func checkBridgeMapping(physicalNetworkName string) error {
+	ovnBridgeMappings, stderr, err := util.RunOVSVsctl("--if-exists", "get", "Open_vSwitch", ".",
+		"external_ids:ovn-bridge-mappings")
+	if err != nil {
+		return fmt.Errorf("failed to get ovn-bridge-mappings from the OVS global table. stderr: %s (%v)", stderr, err)
+	}
+
+	bridgeMappings := strings.Split(ovnBridgeMappings, ",")
+	for _, bridgeMapping := range bridgeMappings {
+		m := strings.Split(bridgeMapping, ":")
+		if m[0] == physicalNetworkName {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("failed to find bridge mapping for physicalNetworkName: %q, ovn-bridge-mappings external_ids %s", physicalNetworkName, ovnBridgeMappings)
 }

@@ -578,6 +578,11 @@ var _ = ginkgo.Describe("OVN MultiNetworkPolicy Operations", func() {
 					startOvn(initialDB, watchNodes, []v1.Node{node}, []v1.Namespace{namespace1}, nil, nil,
 						[]nettypes.NetworkAttachmentDefinition{*nad}, []testPod{}, map[string]string{labelName: labelVal})
 
+					fakeOvn.fexec.AddFakeCmd(&ovntest.ExpectedCmd{
+						Cmd:    getExternalIdsCmd(),
+						Output: "physnet:br-ex,network1:ovsbr1\n",
+					})
+
 					ocInfo := fakeOvn.secondaryControllers[secondaryNetworkName]
 
 					// check that the node zone is tracked as expected
@@ -632,3 +637,7 @@ var _ = ginkgo.Describe("OVN MultiNetworkPolicy Operations", func() {
 		)
 	})
 })
+
+func getExternalIdsCmd() string {
+	return fmt.Sprintf("ovs-vsctl --timeout=15 --if-exists get Open_vSwitch . external_ids:ovn-bridge-mappings")
+}

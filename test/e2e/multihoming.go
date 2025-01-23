@@ -67,6 +67,18 @@ var _ = Describe("Multi Homing", func() {
 			netConfig.namespace = f.Namespace.Name
 			podConfig.namespace = f.Namespace.Name
 
+			By("applying ovs bridge mapping")
+			pods := ovsPods(cs)
+			Expect(pods).NotTo(BeEmpty())
+			for _, pods := range pods {
+				err := configureBridgeMappings(
+					pods.Name,
+					defaultNetworkBridgeMapping(),
+					bridgeMapping(netConfig.networkName, bridgeName),
+				)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
 			By("creating the attachment configuration")
 			_, err := nadClient.NetworkAttachmentDefinitions(netConfig.namespace).Create(
 				context.Background(),

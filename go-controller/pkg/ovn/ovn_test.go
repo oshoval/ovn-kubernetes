@@ -34,6 +34,7 @@ import (
 	udnclientfake "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/crd/userdefinednetwork/v1/apis/clientset/versioned/fake"
 	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/networkmanager"
 	testnm "github.com/ovn-org/ovn-kubernetes/go-controller/pkg/testing/networkmanager"
+	"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/vswitchd"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -564,7 +565,21 @@ func (o *FakeOVN) NewSecondaryNetworkController(netattachdef *nettypes.NetworkAt
 			secondaryController = &l2Controller.BaseSecondaryNetworkController
 			o.fullSecondaryL2Controllers[netName] = l2Controller
 		case types.LocalnetTopology:
-			localnetController := NewSecondaryLocalnetNetworkController(cnci, nInfo, o.networkManager.Interface())
+			testDB := []libovsdbtest.TestData{
+				&vswitchd.OpenvSwitch{
+					ExternalIDs: map[string]string{
+						"ovn-bridge-mappings": "physnet:breth0,network1:ovsbr1",
+					},
+				},
+			}
+			dbSetup := libovsdbtest.TestSetup{
+				OVSData: testDB,
+			}
+			ovsClient, _, err := libovsdbtest.NewOVSTestHarness(dbSetup)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			localnetController, err := newSecondaryLocalnetNetworkController(cnci, nInfo, o.networkManager.Interface(), ovsClient)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			if o.asf != nil { // use fake asf only when enabled
 				localnetController.addressSetFactory = asf
 			}

@@ -90,6 +90,7 @@ type FakeOVN struct {
 	networkManager networkmanager.Controller
 	eIPController  *EgressIPController
 	portCache      *PortCache
+	fexec          *ovntest.FakeExec
 
 	// information map of all secondary network controllers
 	secondaryControllers       map[string]secondaryControllerInfo
@@ -103,20 +104,19 @@ func NewFakeOVN(useFakeAddressSet bool) *FakeOVN {
 		asf = addressset.NewFakeAddressSetFactory(DefaultNetworkControllerName)
 	}
 	return &FakeOVN{
-		asf:          asf,
-		fakeRecorder: record.NewFakeRecorder(10),
-		egressQoSWg:  &sync.WaitGroup{},
-		egressSVCWg:  &sync.WaitGroup{},
-		anpWg:        &sync.WaitGroup{},
-
+		asf:                        asf,
+		fakeRecorder:               record.NewFakeRecorder(10),
+		egressQoSWg:                &sync.WaitGroup{},
+		egressSVCWg:                &sync.WaitGroup{},
+		anpWg:                      &sync.WaitGroup{},
 		secondaryControllers:       map[string]secondaryControllerInfo{},
 		fullSecondaryL2Controllers: map[string]*SecondaryLayer2NetworkController{},
 	}
 }
 
 func (o *FakeOVN) start(objects ...runtime.Object) {
-	fexec := ovntest.NewFakeExec()
-	err := util.SetExec(fexec)
+	o.fexec = ovntest.NewFakeExec()
+	err := util.SetExec(o.fexec)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	egressIPObjects := []runtime.Object{}

@@ -52,10 +52,13 @@ type NodeControllerManager struct {
 func (ncm *NodeControllerManager) NewNetworkController(nInfo util.NetInfo) (networkmanager.NetworkController, error) {
 	topoType := nInfo.TopologyType()
 	switch topoType {
-	case ovntypes.Layer3Topology, ovntypes.Layer2Topology, ovntypes.LocalnetTopology:
-		// Pass a shallow clone of the watch factory, this allows multiplexing
-		// informers for secondary networks.
+	// Pass a shallow clone of the watch factory, this allows multiplexing
+	// informers for secondary networks.
+	case ovntypes.Layer3Topology, ovntypes.Layer2Topology:
 		return node.NewSecondaryNodeNetworkController(ncm.newCommonNetworkControllerInfo(ncm.watchFactory.(*factory.WatchFactory).ShallowClone()),
+			nInfo, ncm.vrfManager, ncm.ruleManager, ncm.defaultNodeNetworkController.Gateway)
+	case ovntypes.LocalnetTopology:
+		return node.NewSecondaryNodeLocalNetNetworkController(ncm.newCommonNetworkControllerInfo(ncm.watchFactory.(*factory.WatchFactory).ShallowClone()),
 			nInfo, ncm.vrfManager, ncm.ruleManager, ncm.defaultNodeNetworkController.Gateway)
 	}
 	return nil, fmt.Errorf("topology type %s not supported", topoType)

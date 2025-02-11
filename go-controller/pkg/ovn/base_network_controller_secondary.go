@@ -63,6 +63,7 @@ func (bsnc *BaseSecondaryNetworkController) AddSecondaryNetworkResourceCommon(ob
 		if !ok {
 			return fmt.Errorf("could not cast %T object to *knet.Pod", obj)
 		}
+		klog.Infof("DBG at AddSecondaryNetworkResourceCommon")
 		return bsnc.ensurePodForSecondaryNetwork(pod, true)
 
 	case factory.NamespaceType:

@@ -30,7 +30,7 @@ import (
 )
 
 type ipAllocatorStub struct {
-	netxtIPs         []*net.IPNet
+	nextIPs         []*net.IPNet
 	allocateIPsError error
 	releasedIPs      []*net.IPNet
 }
@@ -40,7 +40,7 @@ func (a *ipAllocatorStub) AllocateIPs(ips []*net.IPNet) error {
 }
 
 func (a *ipAllocatorStub) AllocateNextIPs() ([]*net.IPNet, error) {
-	return a.netxtIPs, nil
+	return a.nextIPs, nil
 }
 
 func (a *ipAllocatorStub) ReleaseIPs(ips []*net.IPNet) error {
@@ -160,7 +160,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					IPRequest: []string{"192.168.0.4/24"},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,
@@ -182,7 +182,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					GatewayRequest: ovntest.MustParseIPs("192.168.0.1"),
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,
@@ -214,7 +214,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 			ipam: true,
 			args: args{
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,
@@ -247,7 +247,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 			persistentIPAllocation: true,
 			args: args{
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24", "2010:100:200::3/60"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24", "2010:100:200::3/60"),
 				},
 				idAllocator: &idAllocatorStub{
 					nextID: 100,
@@ -287,7 +287,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 			persistentIPAllocation: true,
 			args: args{
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("2010:100:200::3/60"),
+					nextIPs: ovntest.MustParseIPNets("2010:100:200::3/60"),
 				},
 				idAllocator: &idAllocatorStub{
 					nextID: 100,
@@ -376,7 +376,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					IPRequest: []string{"192.168.0.4/24"},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,
@@ -413,7 +413,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					IPRequest: []string{"192.168.0.4/24"},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs:         ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs:         ovntest.MustParseIPNets("192.168.0.3/24"),
 					allocateIPsError: ipam.ErrAllocated,
 				},
 			},
@@ -450,7 +450,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					IPRequest: []string{"192.168.0.4/24"},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs:         ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs:         ovntest.MustParseIPNets("192.168.0.3/24"),
 					allocateIPsError: errors.New("Allocate IPs failed"),
 				},
 			},
@@ -486,7 +486,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					IPRequest: []string{"ivalid"},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantErr: true,
@@ -500,7 +500,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					MacRequest: "ivalid",
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantErr:         true,
@@ -516,7 +516,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					MacRequest: requestedMAC,
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,
@@ -552,7 +552,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					MacRequest: "invalid",
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			invalidNetworkAnnotation: true,
@@ -578,7 +578,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,
@@ -606,7 +606,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod:            true,
@@ -633,7 +633,7 @@ func Test_allocatePodAnnotationWithRollback(t *testing.T) {
 					Status: ipamclaimsapi.IPAMClaimStatus{},
 				},
 				ipAllocator: &ipAllocatorStub{
-					netxtIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
+					nextIPs: ovntest.MustParseIPNets("192.168.0.3/24"),
 				},
 			},
 			wantUpdatedPod: true,

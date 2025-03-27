@@ -48,8 +48,6 @@ ubuntu-shared-gw-deployment: ubuntu-image
 fedora-image: bld
 	${OCI_BIN} build \
 		--build-arg OVN_FROM=${OVN_FROM} \
-		--build-arg OVN_REPO=${OVN_REPO} \
-		--build-arg OVN_GITREF=${OVN_GITSHA} \
 		-t ${IMAGE} \
 		-f Dockerfile.fedora .
 

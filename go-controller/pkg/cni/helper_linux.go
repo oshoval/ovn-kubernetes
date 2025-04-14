@@ -255,16 +255,7 @@ func setupInterface(netns ns.NetNS, containerID, ifName string, ifInfo *PodInter
 
 		// If we have the ipv6 gateway LLA then this is a primary layer2 UDN
 		if len(ifInfo.GatewayIPv6LLA) > 0 {
-			const (
-				tableName  = "ingress_filter"
-				RALifetime = "@th,48,16"
-			)
-			nft, err := knftables.New(knftables.NetDevFamily, tableName)
-			if err != nil {
-				return fmt.Errorf("failed to initialize table: %w", err)
-			}
-
-			if err = setupIngressFilter(nft, ifInfo.GatewayIPv6LLA.String(), RALifetime); err != nil {
+			if err = setupIngressFilter(ifInfo.GatewayIPv6LLA.String()); err != nil {
 				return err
 			}
 		}
@@ -837,11 +828,32 @@ func (pr *PodRequest) deletePorts(ifaces []string, podNamespace, podName string)
 	}
 }
 
-func setupIngressFilter(nft knftables.Interface, gwLLA string, lifetime string) error {
+// setupIngressFilter sets up an ingress filter using nftables to block
+// unwanted ICMPv6 Router Advertisement (RA) packets on a specific device.
+// It creates a new nftables table, chain, and rule to drop RA packets
+// that do not match the specified gateway link-local address (gwLLA) and
+// have a Router Advertisement (RA) lifetime not equal to 0.
+//
+// The nftables rule created by this function looks like:
+// `icmpv6 type nd-router-advert ip6 saddr != <gwLLA> @th,48,16 != 0 drop`
+//
+// Parameters:
+// - gwLLA: The gateway link-local address to match against in the RA packets.
+//
+// Returns:
+// - error: An error if the nftables setup fails, otherwise nil.
+func setupIngressFilter(gwLLA string) error {
 	const (
-		chainName  = "input"
-		deviceName = "ovn-udn1"
+		tableName   = "ingress_filter"
+		rasLifetime = "@th,48,16" // Offset for RA lifetime field in ICMPv6 packets
+		chainName   = "input"
+		deviceName  = "ovn-udn1"
 	)
+
+	nft, err := knftables.New(knftables.NetDevFamily, tableName)
+	if err != nil {
+		return fmt.Errorf("failed to initialize table: %w", err)
+	}
 
 	tx := nft.NewTransaction()
 
@@ -858,10 +870,11 @@ func setupIngressFilter(nft knftables.Interface, gwLLA string, lifetime string) 
 	tx.Add(&knftables.Rule{
 		Chain: chainName,
 		Rule: knftables.Concat(
-			"icmpv6", "type", "nd-router-advert", "ip6", "saddr", "!=", gwLLA, lifetime, "!=", "0", "drop",
+			"icmpv6", "type", "nd-router-advert", "ip6", "saddr", "!=", gwLLA, rasLifetime, "!=", "0", "drop",
 		),
 	})
 
+	// Execute the transaction
 	if err := nft.Run(context.Background(), tx); err != nil {
 		return fmt.Errorf("could not update netdev nftables: %v", err)
 	}
